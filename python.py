@@ -1,37 +1,76 @@
 # app.py
 import streamlit as st
 import pandas as pd
+import io
 
 # ⚙️ Cấu hình giao diện
 st.set_page_config(page_title="Chatbot Trắc Nghiệm", page_icon="📝", layout="wide")
 
 st.title("🤖 Chatbot Trắc nghiệm")
-st.markdown("Giao diện gồm **2 cột**: 📂 bên trái tải file câu hỏi – 💬 bên phải nhập từ khóa để tìm đáp án.")
+st.markdown("📂 **Trái:** Quản lý file câu hỏi — 💬 **Phải:** Tra cứu đáp án đúng.")
 
-# 🧭 Chia bố cục 2 cột: Trái - Phải
-col1, col2 = st.columns([1, 2])  # [tỉ lệ cột trái, cột phải]
+# Khởi tạo session lưu danh sách file đã tải
+if "uploaded_files" not in st.session_state:
+    st.session_state.uploaded_files = {}  # dict: {tên file: DataFrame}
 
-# --- 📂 CỘT TRÁI: TẢI FILE EXCEL ---
+# 🧭 Chia bố cục 2 cột có đường kẻ phân cách
+col1, col2 = st.columns([1, 2])
+
+# ========================
+# 📂 CỘT TRÁI: QUẢN LÝ FILE
+# ========================
 with col1:
-    st.subheader("📂 Tải file câu hỏi")
-    uploaded_file = st.file_uploader("Chọn file Excel", type=["xlsx", "xls"])
+    st.subheader("📂 Tải & Quản lý file")
 
-    if uploaded_file:
-        try:
-            df = pd.read_excel(uploaded_file)
-            st.success(f"✅ Đã tải thành công {len(df)} câu hỏi.")
-        except Exception as e:
-            st.error(f"Lỗi khi đọc file: {e}")
-            st.stop()
+    uploaded_files = st.file_uploader(
+        "Tải lên một hoặc nhiều file Excel",
+        type=["xlsx", "xls"],
+        accept_multiple_files=True
+    )
+
+    # ✅ Đọc dữ liệu từ các file mới tải
+    if uploaded_files:
+        for file in uploaded_files:
+            if file.name not in st.session_state.uploaded_files:
+                try:
+                    df = pd.read_excel(file)
+                    st.session_state.uploaded_files[file.name] = df
+                except Exception as e:
+                    st.error(f"❌ Lỗi đọc file {file.name}: {e}")
+
+    # 📋 Danh sách file đã tải
+    if st.session_state.uploaded_files:
+        st.markdown("### 📄 Danh sách file đã tải:")
+        for filename in list(st.session_state.uploaded_files.keys()):
+            cols = st.columns([4, 1])
+            with cols[0]:
+                st.write(f"📎 {filename}")
+            with cols[1]:
+                # 🧹 Nút xóa file
+                if st.button("🗑️ Xóa", key=f"delete_{filename}"):
+                    del st.session_state.uploaded_files[filename]
+                    st.experimental_rerun()
     else:
-        st.info("⏳ Vui lòng tải file Excel để bắt đầu.")
-        df = None
+        st.info("⚠️ Chưa có file nào được tải lên.")
 
-# --- 💬 CỘT PHẢI: CHATBOT TÌM CÂU HỎI ---
+# ==========================
+# 💬 CỘT PHẢI: TRA CỨU CHATBOT
+# ==========================
+# Kẻ đường phân cách dọc giữa 2 cột
+st.markdown(
+    """
+    <hr style="border: none; border-top: 2px solid #ccc; margin-top: -1rem; margin-bottom: 1rem;">
+    """,
+    unsafe_allow_html=True
+)
+
 with col2:
     st.subheader("💬 Chatbot tra cứu đáp án")
 
-    if df is not None:
+    # Gộp dữ liệu từ tất cả các file đã tải
+    if st.session_state.uploaded_files:
+        combined_df = pd.concat(st.session_state.uploaded_files.values(), ignore_index=True)
+
         user_input = st.text_input("🔎 Nhập từ khóa câu hỏi:")
 
         def tim_cau_hoi(keyword, dataframe):
@@ -39,7 +78,7 @@ with col2:
             return dataframe[dataframe['CÂU HỎI'].str.lower().str.contains(keyword_lower, na=False)]
 
         if st.button("Tìm kiếm") and user_input:
-            results = tim_cau_hoi(user_input, df)
+            results = tim_cau_hoi(user_input, combined_df)
             if results.empty:
                 st.warning("❌ Không tìm thấy câu hỏi nào phù hợp.")
             else:
@@ -50,10 +89,14 @@ with col2:
                     st.success(f"✅ **Đáp án đúng:** {noi_dung_dap_an}")
                     st.divider()
     else:
-        st.info("📌 Vui lòng tải file ở cột bên trái trước khi tra cứu.")
+        st.info("📌 Vui lòng tải ít nhất một file ở cột bên trái trước khi tra cứu.")
 
-# --- 📖 HƯỚNG DẪN ---
+# ==========================
+# 📘 HƯỚNG DẪN
+# ==========================
 with st.expander("📘 Hướng dẫn sử dụng"):
-    st.write("- Tải file Excel có cấu trúc: STT | CÂU HỎI | ĐÁP ÁN 1–4 | ĐÁP ÁN ĐÚNG (là số thứ tự 1–4).")
-    st.write("- Sau khi tải file → nhập từ khóa → bot trả về Câu hỏi & Đáp án đúng.")
-    st.write("- Giao diện chia 2 vùng: Trái để tải file, Phải để tìm kiếm.")
+    st.write("- Có thể tải lên **nhiều file Excel** cùng lúc.")
+    st.write("- Sau khi tải, có thể 🗑️ **xóa** từng file không cần.")
+    st.write("- Chatbot sẽ tìm kiếm trong **tất cả các file còn lại**.")
+    st.write("- File Excel cần có cột: STT | CÂU HỎI | ĐÁP ÁN 1–4 | ĐÁP ÁN ĐÚNG.")
+    st.write("- “ĐÁP ÁN ĐÚNG” là số thứ tự từ 1 đến 4.")
