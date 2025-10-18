@@ -6,7 +6,7 @@ import pandas as pd
 # ==========================
 st.set_page_config(page_title="Chatbot Trắc Nghiệm", page_icon="🤖", layout="wide")
 st.title("🤖 Chatbot Trắc nghiệm")
-st.markdown("📂 **Trái:** Tải file câu hỏi — 💬 **Phải:** Tra cứu đáp án đúng.")
+st.markdown("📂 **Trái:** Vui lòng Tải các file câu hỏi theo nghiệp vụ — 💬 **Phải:** Tra cứu đáp án đúng.")
 
 # ==========================
 # 🧠 Session State
