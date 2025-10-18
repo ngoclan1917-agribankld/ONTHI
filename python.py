@@ -2,19 +2,19 @@
 import streamlit as st
 import pandas as pd
 
+# Cấu hình giao diện
 st.set_page_config(page_title="Chatbot Trắc Nghiệm", page_icon="📝", layout="centered")
 
 st.title("🤖 Chatbot Trắc nghiệm")
-st.write("Nhập từ khóa để chatbot tìm câu hỏi liên quan và trả lời đáp án đúng.")
+st.write("Nhập từ khóa để chatbot tìm câu hỏi liên quan và trả về đáp án đúng.")
 
-# --- Bước 1: Upload hoặc đọc sẵn file Excel ---
+# --- Bước 1: Upload file Excel ---
 uploaded_file = st.file_uploader("📂 Tải lên file Excel câu hỏi trắc nghiệm", type=["xlsx", "xls"])
 
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file)
-        st.success(f"✅ Đã tải {len(df)} câu hỏi.")
-        st.dataframe(df.head())  # Xem trước dữ liệu
+        st.success(f"✅ Đã tải thành công {len(df)} câu hỏi.")
     except Exception as e:
         st.error(f"Lỗi khi đọc file: {e}")
         st.stop()
@@ -22,11 +22,9 @@ else:
     st.info("⏳ Vui lòng tải file Excel để bắt đầu.")
     st.stop()
 
-# --- Bước 2: Hàm tìm câu hỏi ---
+# --- Bước 2: Hàm tìm câu hỏi theo từ khóa ---
 def tim_cau_hoi(keyword, dataframe):
-    # chuyển về lowercase để tìm kiếm không phân biệt hoa thường
     keyword_lower = keyword.lower().strip()
-    # lọc câu hỏi chứa từ khóa
     ket_qua = dataframe[dataframe['CÂU HỎI'].str.lower().str.contains(keyword_lower, na=False)]
     return ket_qua
 
@@ -38,19 +36,15 @@ if st.button("Tìm kiếm") and user_input:
     if results.empty:
         st.warning("❌ Không tìm thấy câu hỏi nào phù hợp.")
     else:
-        for idx, row in results.iterrows():
-            st.markdown(f"**📌 Câu hỏi:** {row['CÂU HỎI']}")
-            st.write(f"1️⃣ {row['ĐÁP ÁN 1']}")
-            st.write(f"2️⃣ {row['ĐÁP ÁN 2']}")
-            st.write(f"3️⃣ {row['ĐÁP ÁN 3']}")
-            st.write(f"4️⃣ {row['ĐÁP ÁN 4']}")
+        for _, row in results.iterrows():
             dap_an_dung = int(row['ĐÁP ÁN ĐÚNG'])
             noi_dung_dap_an = row[f'ĐÁP ÁN {dap_an_dung}']
-            st.success(f"✅ **Đáp án đúng:** {dap_an_dung} — {noi_dung_dap_an}")
+            st.markdown(f"**📌 Câu hỏi:** {row['CÂU HỎI']}")
+            st.success(f"✅ **Đáp án đúng:** {noi_dung_dap_an}")
             st.divider()
 
-# --- Gợi ý tìm kiếm ---
-with st.expander("📖 Gợi ý sử dụng"):
-    st.write("- Nhập từ khóa ngắn gọn (vd: *Việt Nam*, *thủ đô*, *GDP*...)")
-    st.write("- Chatbot sẽ trả về tất cả câu hỏi có chứa từ khóa.")
-    st.write("- Cột “ĐÁP ÁN ĐÚNG” trong Excel phải là số thứ tự của đáp án (1–4).")
+# --- Gợi ý sử dụng ---
+with st.expander("📖 Hướng dẫn sử dụng"):
+    st.write("- Nhập từ khóa ngắn gọn (vd: *Việt Nam*, *thủ đô*...).")
+    st.write("- Chatbot sẽ trả về Câu hỏi và Đáp án đúng tương ứng.")
+    st.write("- Cột “ĐÁP ÁN ĐÚNG” trong Excel phải là số thứ tự (1–4).")
