@@ -1,156 +1,87 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
+
+st.set_page_config(page_title="Tra cứu câu hỏi từ file Excel", layout="wide")
 
 # ==========================
-# ⚙️ Cấu hình giao diện
+# Khởi tạo session state
 # ==========================
-st.set_page_config(page_title="Chatbot Trắc Nghiệm", page_icon="🤖", layout="wide")
-st.title("🤖 Chatbot Trắc nghiệm")
-st.markdown("📂 **Trái:** Tải file câu hỏi — 💬 **Phải:** Tra cứu đáp án đúng.")
-
-# Lưu danh sách file trong session
 if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = {}
 
 # ==========================
-# 📏 CSS tăng khoảng cách và bố cục
+# Hàm đọc dữ liệu từ file Excel
 # ==========================
-st.markdown(
-    """
-    <style>
-    div[data-testid="column"]:first-child {
-        margin-right: 60px !important;
-    }
-    .file-list-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 4px 8px;
-        border-radius: 6px;
-        background-color: #f7f7f7;
-        margin-bottom: 5px;
-    }
-    .file-list-item:hover {
-        background-color: #e9e9e9;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+def read_excel_skip_header(file_data):
+    df = pd.read_excel(file_data, header=None)
+    header_row = None
+    for i in range(len(df)):
+        if df.iloc[i].notna().sum() > 1:
+            header_row = i
+            break
+    if header_row is not None:
+        df = pd.read_excel(file_data, header=header_row)
+    else:
+        df = pd.read_excel(file_data)
+    return df
 
 # ==========================
-# 🧭 2 CỘT GIAO DIỆN
+# Giao diện tải file (Cột trái)
 # ==========================
-col1, col2 = st.columns([1, 2])
+col1, col2 = st.columns([1, 1])
 
-# ==========================
-# 📂 CỘT TRÁI: TẢI FILE
-# ==========================
 with col1:
-    st.subheader("📂 Tải file Excel")
-
-    def read_file_from_header(file):
-        """Tìm dòng chứa 'CÂU HỎI' và đọc dữ liệu từ đó trở xuống"""
-        df_raw = pd.read_excel(file, header=None)
-        header_row_idx = None
-        for i, row in df_raw.iterrows():
-            if any(str(cell).strip().upper() == "CÂU HỎI" for cell in row):
-                header_row_idx = i
-                break
-
-        if header_row_idx is None:
-            raise ValueError("❌ Không tìm thấy dòng tiêu đề có cột 'CÂU HỎI'.")
-
-        df = pd.read_excel(file, header=header_row_idx)
-        return df
-
-    uploaded_files = st.file_uploader(
-        "Chọn file Excel (có thể nhiều)",
+    st.subheader("📁 Chọn file Excel (có thể nhiều)")
+    uploaded = st.file_uploader(
+        " ",  # Không hiển thị label
         type=["xlsx", "xls"],
         accept_multiple_files=True
     )
 
-    # Thêm file mới vào session
-    if uploaded_files:
-        for file in uploaded_files:
-            if file.name not in st.session_state.uploaded_files:
-                try:
-                    df = read_file_from_header(file)
-                    st.session_state.uploaded_files[file.name] = df
-                except Exception as e:
-                    st.error(f"Lỗi đọc file {file.name}: {e}")
+    # Lưu file vào session_state
+    if uploaded:
+        for file in uploaded:
+            st.session_state.uploaded_files[file.name] = file
 
-    # 📄 Danh sách file đã tải + nút X để xóa
+    # Hiển thị danh sách file đã tải + nút xóa
+    for filename in list(st.session_state.uploaded_files.keys()):
+        file_col1, file_col2 = st.columns([5, 1])
+        file_col1.write(filename)
+        if file_col2.button("❌", key=f"delete_{filename}"):
+            del st.session_state.uploaded_files[filename]
+
     if st.session_state.uploaded_files:
-        st.markdown("### 📄 File đã tải:")
-
-        files_to_delete = []
-        for filename in list(st.session_state.uploaded_files.keys()):
-            colA, colB = st.columns([4, 1])
-            with colA:
-                st.markdown(f"<div class='file-list-item'>{filename}</div>", unsafe_allow_html=True)
-            with colB:
-                if st.button("❌", key=f"delete_{filename}"):
-                    files_to_delete.append(filename)
-
-        # Xóa file được chọn
-        for f in files_to_delete:
-            del st.session_state.uploaded_files[f]
-            st.rerun()
-
-        # 🧹 Nút xóa tất cả file đã tải
         if st.button("🧹 Xóa tất cả file đã tải"):
             st.session_state.uploaded_files.clear()
-            st.rerun()
-
-    else:
-        st.info("⚠️ Chưa có file nào được tải lên.")
 
 # ==========================
-# 💬 CỘT PHẢI: CHATBOT
+# Giao diện tra cứu (Cột phải)
 # ==========================
 with col2:
-    st.subheader("💬 Chatbot tra cứu đáp án")
+    st.subheader("🔍 Tra cứu câu hỏi")
+    keyword = st.text_input("Nhập từ khóa và nhấn Enter hoặc bấm Tìm kiếm", "")
+    search_btn = st.button("Tìm kiếm")
 
-    if st.session_state.uploaded_files:
-        # Gộp dữ liệu từ tất cả file đã tải
-        combined_df = pd.concat(st.session_state.uploaded_files.values(), ignore_index=True)
-        combined_df.columns = [str(c).strip().upper() for c in combined_df.columns]
+    st.markdown("<div style='margin-top: 60px;'></div>", unsafe_allow_html=True)  # Tăng khoảng cách gấp 3
 
-        # Ô nhập từ khóa
-        user_input = st.text_input(
-            "🔎 Nhập từ khóa câu hỏi và nhấn Enter hoặc bấm 'Tìm kiếm'"
-        )
+    if (search_btn or keyword) and st.session_state.uploaded_files:
+        results = []
+        for filename, file in st.session_state.uploaded_files.items():
+            try:
+                df = read_excel_skip_header(BytesIO(file.getvalue()))
+                for col in df.columns:
+                    matches = df[df[col].astype(str).str.contains(keyword, case=False, na=False)]
+                    if not matches.empty:
+                        results.append((filename, matches))
+            except Exception as e:
+                st.error(f"Lỗi khi đọc file {filename}: {e}")
 
-        def tim_cau_hoi(keyword, dataframe):
-            kw = keyword.lower().strip()
-            return dataframe[dataframe['CÂU HỎI'].str.lower().str.contains(kw, na=False)]
-
-        # Khi nhấn Enter hoặc nút tìm kiếm
-        if user_input or st.button("Tìm kiếm"):
-            if user_input:
-                results = tim_cau_hoi(user_input, combined_df)
-                if results.empty:
-                    st.warning("❌ Không tìm thấy câu hỏi nào phù hợp.")
-                else:
-                    for _, row in results.iterrows():
-                        try:
-                            dap_an_dung = int(row['ĐÁP ÁN ĐÚNG'])
-                            noi_dung_dap_an = row[f'ĐÁP ÁN {dap_an_dung}']
-                            st.markdown(f"**📌 Câu hỏi:** {row['CÂU HỎI']}")
-                            st.success(f"✅ **Đáp án đúng:** {noi_dung_dap_an}")
-                            st.divider()
-                        except Exception:
-                            st.error("⚠️ File không đúng định dạng cột đáp án.")
-    else:
-        st.info("📌 Vui lòng tải ít nhất một file trước khi tra cứu.")
-
-# ==========================
-# 📘 HƯỚNG DẪN
-# ==========================
-with st.expander("📘 Hướng dẫn sử dụng"):
-    st.write("- Có thể tải nhiều file Excel cùng lúc.")
-    st.write("- Tự động phát hiện dòng tiêu đề có cột 'CÂU HỎI'.")
-    st.write("- Sau khi tải, bạn có thể bấm ❌ để xóa từng file hoặc 🧹 để xóa toàn bộ.")
-    st.write("- Nhập từ khóa câu hỏi và nhấn Enter hoặc nút 'Tìm kiếm'.")
-    st.write("- Cột bắt buộc: STT | CÂU HỎI | ĐÁP ÁN 1–4 | ĐÁP ÁN ĐÚNG.")
+        if results:
+            for filename, matches in results:
+                st.write(f"📌 **Kết quả trong file:** `{filename}`")
+                st.dataframe(matches, use_container_width=True)
+        else:
+            st.warning("❌ Không tìm thấy kết quả nào.")
+    elif (search_btn or keyword) and not st.session_state.uploaded_files:
+        st.warning("⚠️ Vui lòng tải lên ít nhất một file Excel trước khi tra cứu.")
