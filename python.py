@@ -13,6 +13,8 @@ st.markdown("📂 **Trái:** Tải file câu hỏi — 💬 **Phải:** Tra cứ
 # ==========================
 if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = {}
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0  # để reset file_uploader khi xóa
 
 # ==========================
 # 📏 Tăng khoảng cách giữa 2 vùng
@@ -55,7 +57,8 @@ with col1:
     uploaded_files = st.file_uploader(
         "Chọn file Excel (có thể nhiều)",
         type=["xlsx", "xls"],
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        key=f"uploader_{st.session_state.uploader_key}"
     )
 
     if uploaded_files:
@@ -70,6 +73,8 @@ with col1:
     if st.session_state.uploaded_files:
         if st.button("🧹 Xóa tất cả file đã tải"):
             st.session_state.uploaded_files.clear()
+            st.session_state.uploader_key += 1  # reset file_uploader
+            st.rerun()
 
 # ==========================
 # 💬 CỘT PHẢI: CHATBOT
@@ -78,6 +83,7 @@ with col2:
     st.subheader("💬 Chatbot tra cứu đáp án")
 
     if st.session_state.uploaded_files:
+        # Gộp dữ liệu từ tất cả file đã tải
         combined_df = pd.concat(st.session_state.uploaded_files.values(), ignore_index=True)
         combined_df.columns = [str(c).strip().upper() for c in combined_df.columns]
 
