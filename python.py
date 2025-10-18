@@ -6,22 +6,21 @@ import pandas as pd
 # ==========================
 st.set_page_config(page_title="Chatbot Trắc Nghiệm", page_icon="🤖", layout="wide")
 st.title("🤖 Chatbot Trắc nghiệm")
+st.markdown("📂 **Trái:** Tải file câu hỏi — 💬 **Phải:** Tra cứu đáp án đúng.")
 
 # Lưu danh sách file trong session
 if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = {}
 
 # ==========================
-# 📏 Tăng khoảng cách giữa 2 vùng
+# 📏 CSS tăng khoảng cách và bố cục
 # ==========================
 st.markdown(
     """
     <style>
-    /* Tăng khoảng cách giữa 2 cột */
     div[data-testid="column"]:first-child {
         margin-right: 60px !important;
     }
-    /* Căn dòng danh sách file đẹp hơn */
     .file-list-item {
         display: flex;
         justify-content: space-between;
@@ -81,9 +80,7 @@ with col1:
                 except Exception as e:
                     st.error(f"Lỗi đọc file {file.name}: {e}")
 
-    # ==========================
     # 📄 Danh sách file đã tải + nút X để xóa
-    # ==========================
     if st.session_state.uploaded_files:
         st.markdown("### 📄 File đã tải:")
 
@@ -99,12 +96,12 @@ with col1:
         # Xóa file được chọn
         for f in files_to_delete:
             del st.session_state.uploaded_files[f]
-            st.experimental_rerun()
+            st.rerun()
 
-        # 🧹 Nút xóa tất cả
+        # 🧹 Nút xóa tất cả file đã tải
         if st.button("🧹 Xóa tất cả file đã tải"):
             st.session_state.uploaded_files.clear()
-            st.experimental_rerun()
+            st.rerun()
 
     else:
         st.info("⚠️ Chưa có file nào được tải lên.")
