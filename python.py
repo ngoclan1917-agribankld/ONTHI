@@ -52,14 +52,12 @@ with col1:
         df = pd.read_excel(file, header=header_row_idx)
         return df
 
-    # Upload nhiều file
     uploaded_files = st.file_uploader(
         "Chọn file Excel (có thể nhiều)",
         type=["xlsx", "xls"],
         accept_multiple_files=True
     )
 
-    # Lưu file vào session
     if uploaded_files:
         for file in uploaded_files:
             if file.name not in st.session_state.uploaded_files:
@@ -69,7 +67,6 @@ with col1:
                 except Exception as e:
                     st.error(f"Lỗi đọc file {file.name}: {e}")
 
-    # Nút xóa tất cả file
     if st.session_state.uploaded_files:
         if st.button("🧹 Xóa tất cả file đã tải"):
             st.session_state.uploaded_files.clear()
@@ -81,14 +78,42 @@ with col2:
     st.subheader("💬 Chatbot tra cứu đáp án")
 
     if st.session_state.uploaded_files:
-        # Gộp dữ liệu từ tất cả file
         combined_df = pd.concat(st.session_state.uploaded_files.values(), ignore_index=True)
         combined_df.columns = [str(c).strip().upper() for c in combined_df.columns]
 
-        # Ô nhập từ khóa
         user_input = st.text_input(
             "🔎 Nhập từ khóa câu hỏi và nhấn Enter hoặc bấm 'Tìm kiếm'"
         )
         search_btn = st.button("Tìm kiếm")
 
-        def tim_cau_hoi(keywo
+        def tim_cau_hoi(keyword, dataframe):
+            kw = keyword.lower().strip()
+            return dataframe[dataframe['CÂU HỎI'].str.lower().str.contains(kw, na=False)]
+
+        if user_input or search_btn:
+            if user_input:
+                results = tim_cau_hoi(user_input, combined_df)
+                if results.empty:
+                    st.warning("❌ Không tìm thấy câu hỏi nào phù hợp.")
+                else:
+                    for _, row in results.iterrows():
+                        try:
+                            dap_an_dung = int(row['ĐÁP ÁN ĐÚNG'])
+                            noi_dung_dap_an = row[f'ĐÁP ÁN {dap_an_dung}']
+                            st.markdown(f"**📌 Câu hỏi:** {row['CÂU HỎI']}")
+                            st.success(f"✅ **Đáp án đúng:** {noi_dung_dap_an}")
+                            st.divider()
+                        except Exception:
+                            st.error("⚠️ File không đúng định dạng cột đáp án.")
+    else:
+        st.info("📌 Vui lòng tải ít nhất một file trước khi tra cứu.")
+
+# ==========================
+# 📘 HƯỚNG DẪN
+# ==========================
+with st.expander("📘 Hướng dẫn sử dụng"):
+    st.write("- Có thể tải nhiều file Excel cùng lúc.")
+    st.write("- Tự động phát hiện dòng tiêu đề có cột 'CÂU HỎI'.")
+    st.write("- Sau khi tải, có thể xóa tất cả file bằng nút 🧹.")
+    st.write("- Nhập từ khóa câu hỏi và nhấn Enter hoặc nút 'Tìm kiếm'.")
+    st.write("- Cột bắt buộc: STT | CÂU HỎI | ĐÁP ÁN 1–4 | ĐÁP ÁN ĐÚNG.")
