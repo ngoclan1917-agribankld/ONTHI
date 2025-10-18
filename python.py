@@ -1,100 +1,56 @@
+# app.py
 import streamlit as st
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
-# ------------------------
-# SETUP GIAO DIỆN
-# ------------------------
-st.set_page_config(page_title="Chatbot Trắc nghiệm", layout="wide")
-st.title("📚 Chatbot Trắc nghiệm - Tìm đáp án theo từ khóa")
+st.set_page_config(page_title="Chatbot Trắc Nghiệm", page_icon="📝", layout="centered")
 
-# ------------------------
-# PHẦN 1: TẢI FILE
-# ------------------------
-st.header("📤 Bước 1: Tải file câu hỏi (CSV/XLSX)")
+st.title("🤖 Chatbot Trắc nghiệm")
+st.write("Nhập từ khóa để chatbot tìm câu hỏi liên quan và trả lời đáp án đúng.")
 
-uploaded_files = st.file_uploader(
-    "Chọn file .csv hoặc .xlsx chứa câu hỏi trắc nghiệm", 
-    type=["csv", "xlsx"], 
-    accept_multiple_files=True
-)
+# --- Bước 1: Upload hoặc đọc sẵn file Excel ---
+uploaded_file = st.file_uploader("📂 Tải lên file Excel câu hỏi trắc nghiệm", type=["xlsx", "xls"])
 
-@st.cache_data
-def load_data(files):
-    dataframes = []
-    for file in files:
-        try:
-            if file.name.endswith('.csv'):
-                df = pd.read_csv(file)
-            else:
-                df = pd.read_excel(file)
-
-            required_cols = ['STT', 'Câu hỏi', 'Đáp án 1', 'Đáp án 2', 'Đáp án 3', 'Đáp án 4', 'Đáp án đúng', 'Trích dẫn nguồn câu hỏi']
-            if all(col in df.columns for col in required_cols):
-                df = df[required_cols]
-                dataframes.append(df)
-            else:
-                st.error(f"❌ File {file.name} thiếu cột bắt buộc.")
-        except Exception as e:
-            st.error(f"❌ Lỗi khi đọc file {file.name}: {e}")
-    
-    if dataframes:
-        return pd.concat(dataframes, ignore_index=True)
-    return pd.DataFrame()
-
-questions_df = load_data(uploaded_files)
-
-if not questions_df.empty:
-    st.success(f"✅ Đã nạp {len(questions_df)} câu hỏi.")
-    st.dataframe(questions_df.head())
-
-    # ------------------------
-    # PHẦN 2: NHẬP TRUY VẤN
-    # ------------------------
-    st.header("🔍 Bước 2: Nhập từ khóa hoặc câu hỏi cần tìm")
-    user_query = st.text_input("Nhập nội dung cần tìm kiếm")
-
-    if user_query:
-        try:
-            vectorizer = TfidfVectorizer()
-            tfidf_matrix = vectorizer.fit_transform(questions_df['Câu hỏi'])
-            query_vec = vectorizer.transform([user_query])
-            similarity_scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
-
-            best_match_index = similarity_scores.argmax()
-            best_score = similarity_scores[best_match_index]
-
-            if best_score < 0.1:
-                st.warning("❌ Không tìm thấy câu hỏi phù hợp.")
-            else:
-                # ------------------------
-                # PHẦN 3: TRẢ LỜI
-                # ------------------------
-                st.header("📖 Kết quả tìm được")
-
-                match = questions_df.iloc[best_match_index]
-
-                st.subheader("📝 Câu hỏi:")
-                st.write(match['Câu hỏi'])
-
-                st.subheader("🔘 Các lựa chọn:")
-                for i in range(1, 5):
-                    st.write(f"{i}. {match[f'Đáp án {i}']}")
-
-                try:
-                    correct_index = int(str(match['Đáp án đúng']).strip())
-                    correct_content = match[f'Đáp án {correct_index}']
-                    st.subheader("✅ Đáp án đúng:")
-                    st.success(f"{correct_index}. {correct_content}")
-                except:
-                    st.error("❌ Không thể xác định đáp án đúng do định dạng lỗi.")
-
-                if pd.notna(match['Trích dẫn nguồn câu hỏi']):
-                    st.caption(f"📚 Nguồn: {match['Trích dẫn nguồn câu hỏi']}")
-
-                st.caption(f"🔍 Độ tương đồng: {best_score:.2f}")
-        except Exception as e:
-            st.error(f"❌ Lỗi xử lý truy vấn: {e}")
+if uploaded_file:
+    try:
+        df = pd.read_excel(uploaded_file)
+        st.success(f"✅ Đã tải {len(df)} câu hỏi.")
+        st.dataframe(df.head())  # Xem trước dữ liệu
+    except Exception as e:
+        st.error(f"Lỗi khi đọc file: {e}")
+        st.stop()
 else:
-    st.info("👆 Vui lòng tải lên ít nhất 1 file hợp lệ để bắt đầu.")
+    st.info("⏳ Vui lòng tải file Excel để bắt đầu.")
+    st.stop()
+
+# --- Bước 2: Hàm tìm câu hỏi ---
+def tim_cau_hoi(keyword, dataframe):
+    # chuyển về lowercase để tìm kiếm không phân biệt hoa thường
+    keyword_lower = keyword.lower().strip()
+    # lọc câu hỏi chứa từ khóa
+    ket_qua = dataframe[dataframe['CÂU HỎI'].str.lower().str.contains(keyword_lower, na=False)]
+    return ket_qua
+
+# --- Bước 3: Giao diện chat ---
+user_input = st.text_input("💬 Nhập từ khóa câu hỏi:")
+
+if st.button("Tìm kiếm") and user_input:
+    results = tim_cau_hoi(user_input, df)
+    if results.empty:
+        st.warning("❌ Không tìm thấy câu hỏi nào phù hợp.")
+    else:
+        for idx, row in results.iterrows():
+            st.markdown(f"**📌 Câu hỏi:** {row['CÂU HỎI']}")
+            st.write(f"1️⃣ {row['ĐÁP ÁN 1']}")
+            st.write(f"2️⃣ {row['ĐÁP ÁN 2']}")
+            st.write(f"3️⃣ {row['ĐÁP ÁN 3']}")
+            st.write(f"4️⃣ {row['ĐÁP ÁN 4']}")
+            dap_an_dung = int(row['ĐÁP ÁN ĐÚNG'])
+            noi_dung_dap_an = row[f'ĐÁP ÁN {dap_an_dung}']
+            st.success(f"✅ **Đáp án đúng:** {dap_an_dung} — {noi_dung_dap_an}")
+            st.divider()
+
+# --- Gợi ý tìm kiếm ---
+with st.expander("📖 Gợi ý sử dụng"):
+    st.write("- Nhập từ khóa ngắn gọn (vd: *Việt Nam*, *thủ đô*, *GDP*...)")
+    st.write("- Chatbot sẽ trả về tất cả câu hỏi có chứa từ khóa.")
+    st.write("- Cột “ĐÁP ÁN ĐÚNG” trong Excel phải là số thứ tự của đáp án (1–4).")
