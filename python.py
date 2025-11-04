@@ -66,6 +66,8 @@ with col1:
             if file.name not in st.session_state.uploaded_files:
                 try:
                     df = read_file_from_header(file)
+                    # 👉 Thêm cột 'SOURCE_FILE' để biết mỗi dòng thuộc file nào
+                    df["SOURCE_FILE"] = file.name
                     st.session_state.uploaded_files[file.name] = df
                 except Exception as e:
                     st.error(f"Lỗi đọc file {file.name}: {e}")
@@ -106,8 +108,11 @@ with col2:
                         try:
                             dap_an_dung = int(row['ĐÁP ÁN ĐÚNG'])
                             noi_dung_dap_an = row[f'ĐÁP ÁN {dap_an_dung}']
+                            ten_file = row.get("SOURCE_FILE", "Không xác định")
+
                             st.markdown(f"**📌 Câu hỏi:** {row['CÂU HỎI']}")
                             st.success(f"✅ **Đáp án đúng:** {noi_dung_dap_an}")
+                            st.caption(f"📁 Nguồn: *{ten_file}*")  # 👈 Thêm tên file nguồn
                             st.divider()
                         except Exception:
                             st.error("⚠️ File không đúng định dạng cột đáp án.")
